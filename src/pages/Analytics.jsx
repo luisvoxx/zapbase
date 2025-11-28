@@ -5,9 +5,10 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/Button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card'
 import { Input } from '@/components/Input'
+import { UserMenu } from '@/components/UserMenu'
 import { ArrowLeft, Loader2, TrendingUp, DollarSign, BarChart as BarChartIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { format } from 'date-fns'
 import {
   LineChart,
@@ -96,11 +97,27 @@ export function Analytics() {
 
       if (error) throw error
 
+      // DEBUG: Log dos dados retornados
+      console.log('=== DEBUG ANALISADOR ===')
+      console.log('Produtos selecionados:', selectedProducts)
+      console.log('Período:', { startDate, endDate })
+      console.log('Total de métricas retornadas:', metricsData?.length || 0)
+      console.log('Métricas por produto:')
+      const metricsByProduct = {}
+      metricsData?.forEach((m) => {
+        const pName = m.products?.name || 'Unknown'
+        metricsByProduct[pName] = (metricsByProduct[pName] || 0) + 1
+      })
+      console.log(metricsByProduct)
+      console.log('Primeiras 3 métricas:', metricsData?.slice(0, 3))
+      console.log('========================')
+
       // Processar dados
       const analysis = processAnalysisData(metricsData)
       setAnalysisData(analysis)
     } catch (error) {
       toast.error('Erro ao gerar análise: ' + error.message)
+      console.error('Erro no Analisador:', error)
     } finally {
       setAnalyzing(false)
     }
@@ -152,7 +169,7 @@ export function Analytics() {
     // Gráfico 1: Taxa de Conversão por Data
     const dateMap = {}
     metricsData.forEach((metric) => {
-      const date = format(new Date(metric.metric_date), 'dd/MM')
+      const date = formatDate(metric.metric_date)
       const productName = metric.products.name
 
       if (!dateMap[date]) {
@@ -180,16 +197,10 @@ export function Analytics() {
       return result
     })
 
-    // Gráfico 2: Lucro por Produto
-    const lucroChartData = productStats.map((p) => ({
-      name: p.name,
-      resultado: p.resultado,
-    }))
-
-    // Gráfico 3: CPL por Data
+    // Gráfico 2: CPL por Data
     const cplDateMap = {}
     metricsData.forEach((metric) => {
-      const date = format(new Date(metric.metric_date), 'dd/MM')
+      const date = formatDate(metric.metric_date)
       const productName = metric.products.name
 
       if (!cplDateMap[date]) {
@@ -231,7 +242,6 @@ export function Analytics() {
       productStats,
       charts: {
         conversion: conversionChartData,
-        lucro: lucroChartData,
         cpl: cplChartData,
       },
       productNames: [...new Set(metricsData.map((m) => m.products.name))],
@@ -251,11 +261,12 @@ export function Analytics() {
   return (
     <div className="min-h-screen bg-bg-primary">
       <header className="border-b border-border-primary bg-bg-secondary/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Button variant="ghost" onClick={() => navigate('/')}>
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
+          <UserMenu />
         </div>
       </header>
 
@@ -567,50 +578,7 @@ export function Analytics() {
                     </CardContent>
                   </Card>
 
-                  {/* Gráfico 2: Lucro por Produto */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Resultado por Produto</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={analysisData.charts.lucro}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
-                          <XAxis dataKey="name" stroke="#888" />
-                          <YAxis stroke="#888" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#1A1A1A',
-                              border: '1px solid #2A2A2A',
-                              borderRadius: '8px',
-                            }}
-                            formatter={(value) => formatCurrency(value)}
-                          />
-                          <Bar
-                            dataKey="resultado"
-                            fill="#00FF41"
-                            radius={[8, 8, 0, 0]}
-                            shape={(props) => {
-                              const { x, y, width, height, payload } = props
-                              const fill = payload.resultado >= 0 ? '#00FF41' : '#FF0040'
-                              return (
-                                <rect
-                                  x={x}
-                                  y={y}
-                                  width={width}
-                                  height={height}
-                                  fill={fill}
-                                  rx={8}
-                                />
-                              )
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  {/* Gráfico 3: CPL por Período */}
+                  {/* Gráfico 2: CPL por Período */}
                   <Card>
                     <CardHeader>
                       <CardTitle>CPL por Período</CardTitle>

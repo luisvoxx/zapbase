@@ -17,22 +17,45 @@ export function Login() {
     email: '',
     password: '',
   })
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+  })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setErrors({ email: '', password: '' })
     setLoading(true)
 
     try {
       if (isLogin) {
         await signIn(formData.email, formData.password)
         toast.success('Login realizado com sucesso!')
+        navigate('/')
       } else {
         await signUp(formData.email, formData.password)
         toast.success('Conta criada com sucesso! Verifique seu email.')
+        navigate('/')
       }
-      navigate('/')
     } catch (error) {
-      toast.error(error.message || `Erro ao ${isLogin ? 'fazer login' : 'criar conta'}`)
+      const errorMessage = error.message || `Erro ao ${isLogin ? 'fazer login' : 'criar conta'}`
+
+      // Tratar erros específicos
+      if (errorMessage.includes('already registered') || errorMessage.includes('já cadastrado')) {
+        setErrors({ ...errors, email: 'Este email já está cadastrado. Faça login ou use outro email.' })
+        toast.error('Email já cadastrado')
+      } else if (errorMessage.includes('Invalid login credentials')) {
+        setErrors({ ...errors, email: 'Email ou senha incorretos' })
+        toast.error('Email ou senha incorretos')
+      } else if (errorMessage.includes('Password should be at least')) {
+        setErrors({ ...errors, password: 'A senha deve ter pelo menos 6 caracteres' })
+        toast.error('Senha muito curta')
+      } else if (errorMessage.includes('Invalid email')) {
+        setErrors({ ...errors, email: 'Email inválido' })
+        toast.error('Email inválido')
+      } else {
+        toast.error(errorMessage)
+      }
     } finally {
       setLoading(false)
     }
@@ -63,12 +86,17 @@ export function Login() {
                   type="email"
                   placeholder="seu@email.com"
                   value={formData.email}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value })
-                  }
+                    setErrors({ ...errors, email: '' })
+                  }}
                   required
                   disabled={loading}
+                  className={errors.email ? 'border-accent-red focus:border-accent-red' : ''}
                 />
+                {errors.email && (
+                  <p className="text-xs text-accent-red font-semibold">{errors.email}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -81,11 +109,13 @@ export function Login() {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={formData.password}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData({ ...formData, password: e.target.value })
-                    }
+                      setErrors({ ...errors, password: '' })
+                    }}
                     required
                     disabled={loading}
+                    className={errors.password ? 'border-accent-red focus:border-accent-red' : ''}
                   />
                   <button
                     type="button"
@@ -99,7 +129,10 @@ export function Login() {
                     )}
                   </button>
                 </div>
-                {!isLogin && (
+                {errors.password && (
+                  <p className="text-xs text-accent-red font-semibold">{errors.password}</p>
+                )}
+                {!isLogin && !errors.password && (
                   <p className="text-xs text-text-muted">Mínimo de 6 caracteres</p>
                 )}
               </div>

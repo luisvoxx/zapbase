@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/Button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card'
 import { Input } from '@/components/Input'
-import { Plus, Search, Loader2, BarChart, LogOut, TrendingUp } from 'lucide-react'
+import { UserMenu } from '@/components/UserMenu'
+import { Plus, Search, Loader2, BarChart, TrendingUp, Edit2, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency } from '@/lib/utils'
 import { format, subDays } from 'date-fns'
@@ -20,6 +21,11 @@ export function Dashboard() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [newProductName, setNewProductName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(null)
+  const [editProductName, setEditProductName] = useState('')
+  const [updating, setUpdating] = useState(false)
+  const [deletingProduct, setDeletingProduct] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Filtros de período
   const [startDate, setStartDate] = useState('')
@@ -130,13 +136,51 @@ export function Dashboard() {
     }
   }
 
-  const handleLogout = async () => {
+  const handleEditProduct = async (e) => {
+    e.preventDefault()
+    if (!editProductName.trim()) return
+
+    setUpdating(true)
+
     try {
-      await signOut()
-      toast.success('Logout realizado!')
-      navigate('/login')
+      const { error } = await supabase
+        .from('products')
+        .update({ name: editProductName })
+        .eq('id', editingProduct.id)
+
+      if (error) throw error
+
+      toast.success('Produto atualizado com sucesso!')
+      setEditingProduct(null)
+      setEditProductName('')
+      await fetchProducts()
     } catch (error) {
-      toast.error('Erro ao fazer logout')
+      toast.error('Erro ao atualizar produto: ' + error.message)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleDeleteProduct = async () => {
+    if (!deletingProduct) return
+
+    setDeleting(true)
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', deletingProduct.id)
+
+      if (error) throw error
+
+      toast.success('Produto excluído com sucesso!')
+      setDeletingProduct(null)
+      await fetchProducts()
+    } catch (error) {
+      toast.error('Erro ao excluir produto: ' + error.message)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -159,10 +203,7 @@ export function Dashboard() {
             </h1>
           </div>
 
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-            Sair
-          </Button>
+          <UserMenu />
         </div>
       </header>
 
@@ -260,59 +301,101 @@ export function Dashboard() {
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <Card
-                  key={product.id}
-                  className="cursor-pointer hover:shadow-[0_0_20px_rgba(0,255,65,0.2)]"
-                  onClick={() => navigate(`/products/${product.id}/metrics`)}
-                >
-                  <CardHeader>
-                    <CardTitle className="text-xl">{product.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-sm text-text-secondary">
-                      {product.metrics_count} métrica
-                      {product.metrics_count !== 1 ? 's' : ''} cadastrada
-                      {product.metrics_count !== 1 ? 's' : ''}
-                    </div>
+              {filteredProducts.map((product) => {
+                const investido = product.total_faturamento - product.resultado_total
+                const cpl = product.total_leads > 0 ? investido / product.total_leads : 0
+                const taxaConv = product.total_leads > 0 ? (product.total_vendas / product.total_leads) * 100 : 0
 
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <div className="text-text-muted">Leads</div>
-                        <div className="font-semibold text-text-primary">
-                          {product.total_leads}
+                return (
+                  <Card
+                    key={product.id}
+                    className="relative hover:shadow-[0_0_20px_rgba(0,255,65,0.2)] transition-shadow cursor-pointer"
+                    onClick={() => navigate(`/products/${product.id}/metrics`)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-xl hover:text-accent-green transition-colors flex-1">
+                          {product.name}
+                        </CardTitle>
+                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingProduct(product)
+                              setEditProductName(product.name)
+                            }}
+                            className="p-1.5 hover:bg-bg-primary rounded transition-colors text-text-muted hover:text-accent-cyan"
+                            title="Editar produto"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeletingProduct(product)
+                            }}
+                            className="p-1.5 hover:bg-bg-primary rounded transition-colors text-text-muted hover:text-accent-red"
+                            title="Excluir produto"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-                      <div>
-                        <div className="text-text-muted">Vendas</div>
-                        <div className="font-semibold text-text-primary">
-                          {product.total_vendas}
+                      <p className="text-xs text-text-muted mt-1">
+                        {product.metrics_count} métrica{product.metrics_count !== 1 ? 's' : ''}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <div className="text-text-muted text-xs">Leads</div>
+                          <div className="font-semibold text-text-primary">
+                            {product.total_leads}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted text-xs">Vendas</div>
+                          <div className="font-semibold text-text-primary">
+                            {product.total_vendas}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted text-xs">CPL Médio</div>
+                          <div className="font-semibold text-[#3B82F6]">
+                            {formatCurrency(cpl)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted text-xs">Taxa Conv.</div>
+                          <div className="font-semibold text-[#A855F7]">
+                            {taxaConv.toFixed(1)}%
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <div className="text-text-muted text-sm">Faturamento</div>
-                      <div className="font-bold text-lg text-text-primary">
-                        {formatCurrency(product.total_faturamento)}
+                      <div className="pt-2 border-t border-border-primary">
+                        <div className="text-text-muted text-xs">Faturamento</div>
+                        <div className="font-bold text-text-primary">
+                          {formatCurrency(product.total_faturamento)}
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <div className="text-text-muted text-sm">Resultado</div>
-                      <div
-                        className={`font-bold text-lg ${
-                          product.resultado_total >= 0
-                            ? 'text-accent-green'
-                            : 'text-accent-red'
-                        }`}
-                      >
-                        {formatCurrency(product.resultado_total)}
+                      <div>
+                        <div className="text-text-muted text-xs">Resultado</div>
+                        <div
+                          className={`font-bold text-lg ${
+                            product.resultado_total >= 0
+                              ? 'text-accent-green'
+                              : 'text-accent-red'
+                          }`}
+                        >
+                          {formatCurrency(product.resultado_total)}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </div>
@@ -368,6 +451,116 @@ export function Dashboard() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal Editar Produto */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md m-4">
+            <CardHeader>
+              <CardTitle>Editar Produto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleEditProduct} className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="editProductName" className="text-sm text-text-secondary">
+                    Nome do Produto
+                  </label>
+                  <Input
+                    id="editProductName"
+                    placeholder="Nome do produto"
+                    value={editProductName}
+                    onChange={(e) => setEditProductName(e.target.value)}
+                    minLength={3}
+                    maxLength={100}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingProduct(null)
+                      setEditProductName('')
+                    }}
+                    disabled={updating}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={updating} className="flex-1">
+                    {updating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      'Salvar'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal Excluir Produto */}
+      {deletingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md m-4">
+            <CardHeader>
+              <CardTitle>Excluir Produto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-text-secondary">
+                  Tem certeza que deseja excluir o produto{' '}
+                  <span className="font-semibold text-text-primary">
+                    {deletingProduct.name}
+                  </span>
+                  ?
+                </p>
+                <p className="text-sm text-accent-red">
+                  Esta ação não pode ser desfeita. Todas as métricas associadas também serão
+                  excluídas.
+                </p>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDeletingProduct(null)}
+                    disabled={deleting}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleDeleteProduct}
+                    disabled={deleting}
+                    className="flex-1 bg-accent-red hover:bg-accent-red/90"
+                  >
+                    {deleting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Excluindo...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

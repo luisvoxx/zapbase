@@ -17,23 +17,28 @@ export function formatROAS(value) {
   return `${(value || 0).toFixed(2)}x`
 }
 
-// Formatação de data (DD/MM)
-export function formatDate(date) {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  return dateObj.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-  })
+/**
+ * Formata uma data no formato YYYY-MM-DD para DD/MM
+ * SEM conversão de timezone (evita bug de dia anterior)
+ * @param {string} dateString - Data no formato YYYY-MM-DD (ex: "2025-11-28")
+ * @returns {string} - Data formatada DD/MM (ex: "28/11")
+ */
+export function formatDate(dateString) {
+  if (!dateString) return ''
+  const [year, month, day] = dateString.split('-')
+  return `${day}/${month}`
 }
 
-// Formatação de data completa (DD/MM/YYYY)
-export function formatFullDate(date) {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  return dateObj.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+/**
+ * Formata uma data no formato YYYY-MM-DD para DD/MM/YYYY
+ * SEM conversão de timezone (evita bug de dia anterior)
+ * @param {string} dateString - Data no formato YYYY-MM-DD (ex: "2025-11-28")
+ * @returns {string} - Data formatada DD/MM/YYYY (ex: "28/11/2025")
+ */
+export function formatFullDate(dateString) {
+  if (!dateString) return ''
+  const [year, month, day] = dateString.split('-')
+  return `${day}/${month}/${year}`
 }
 
 // Cálculo de CPL (Custo por Lead)
